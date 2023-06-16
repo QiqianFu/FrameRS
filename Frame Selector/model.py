@@ -27,7 +27,9 @@ class Best_Frame_Select(nn.Module):
     def __init__(self):
         super(Best_Frame_Select, self).__init__()
 
-        self.conv1d = nn.Conv1d(384, 384, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(384, 192, kernel_size=(3,1),stride = (1,1), padding=(1,0))
+        self.conv2 = nn.Conv2d(192, 192, kernel_size=(3,4),stride = (1,1), padding=(1,0))
+        self.conv3 = nn.Conv1d(192,192,kernel_size=3,padding=1)
         self.bn = nn.BatchNorm1d(384)
         self.relu = nn.ReLU()
         self.drop = nn.Dropout(p=0.1)
@@ -39,32 +41,36 @@ class Best_Frame_Select(nn.Module):
 
     def forward(self, input):
         input = self.bn(input)
+        input = self.conv1(input)
+        input = self.conv2(input) #output should be (b, 192, 8, 1)
+        input = input.transpose(2, 1)
+        input = rearrange(input, 'b t c a-> b (t c)', a=1)
         identity = input
-        input = self.conv1d(input)
+        input = self.conv3(input)
         input = self.drop(input)
         input = self.relu(input)
 
-        input = self.conv1d(input)
+        input = self.conv3(input)
         input = self.drop(input)
         input += identity
         input = self.relu(input)
 
         identity = input
-        input = self.conv1d(input)
+        input = self.conv3(input)
         input = self.drop(input)
         input = self.relu(input)
 
-        input = self.conv1d(input)
+        input = self.conv3(input)
         input = self.drop(input)
         input += identity
         input = self.relu(input)
 
         identity = input
-        input = self.conv1d(input)
+        input = self.conv3(input)
         input = self.drop(input)
         input = self.relu(input)
 
-        input = self.conv1d(input)
+        input = self.conv3(input)
         input = self.drop(input)
         input += identity
         input = self.relu(input)

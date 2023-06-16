@@ -13,7 +13,6 @@ from decord import VideoReader, cpu
 from torchvision import transforms
 from transforms import *
 import torch.nn as nn
-from dataset_build import FrameSelect
 from torch.utils.data import DataLoader, Dataset
 import argparse
 from tabnanny import check
@@ -31,38 +30,7 @@ from decord import VideoReader, cpu
 from torchvision import transforms
 from transforms import *
 import torch.nn as nn
-class MyDataset(Dataset):
 
-    def __init__(self, data, label_list, data2, list2, data3, list3, data4, list4):
-        super(MyDataset, self).__init__()
-        self.data = data
-        self.label_list = label_list
-        self.data2 = data2
-        self.list2 = list2
-        self.data3 = data3
-        self.list3 = list3
-        self.data4 = data4
-        self.list4 = list4
-
-    def __getitem__(self, index):
-        if index < 26640:
-            img = self.data[index]
-
-            label = int(self.label_list[index])
-        elif index >= 26640 and index < 36640:
-            img = self.data2[index - 26640]
-            label = int(self.list2[index - 26640])
-        elif index >= 36640 and index < 86640:
-            img = self.data3[index - 36640]
-            label = int(self.list3[index - 36640])
-        else:
-            img = self.data4[index - 86640]
-            label = int(self.list4[index - 86640])
-
-        return img, label
-
-    def __len__(self):
-        return int(136638)
 
 
 class TubeMaskingGenerator:
@@ -155,21 +123,21 @@ def evaluate_fun(video_data,args,frame_id_list,device,patch_size,model,list_1):
             a=[(i,k),loss_value]
             list_1.append(a)
 
-    # frame_list=[0,1,2,3,4,5,6,7]
-    # img = [Image.fromarray(video_data[vid, :, :, :]).convert('RGB') for vid, _ in enumerate(frame_id_list)]
-    # transforms = DataAugmentationForVideoMAE(args)
-    # img, bool_masked_pos = transforms((img, None),frame_list=frame_list) # T*C,H,W
-    # # print(img.shape)
-    # img = img.view((args.num_frames , 3) + img.size()[-2:]).transpose(0,1) # T*C,H,W -> T,C,H,W -> C,T,H,W
-    # # img = img.view(( -1 , args.num_frames) + img.size()[-2:])
-    # bool_masked_pos = torch.from_numpy(bool_masked_pos)
+    frame_list=[0,1,2,3,4,5,6,7]
+    img = [Image.fromarray(video_data[vid, :, :, :]).convert('RGB') for vid, _ in enumerate(frame_id_list)]
+    transforms = DataAugmentationForVideoMAE(args)
+    img, bool_masked_pos = transforms((img, None),frame_list=frame_list) # T*C,H,W
+    # print(img.shape)
+    img = img.view((args.num_frames , 3) + img.size()[-2:]).transpose(0,1) # T*C,H,W -> T,C,H,W -> C,T,H,W
+    # img = img.view(( -1 , args.num_frames) + img.size()[-2:])
+    bool_masked_pos = torch.from_numpy(bool_masked_pos)
 
-    # with torch.no_grad():
-    #     # img = img[None, :]
-    #     # bool_masked_pos = bool_masked_pos[None, :]
-    #     img = img.unsqueeze(0) #1,3,16,224,224
-    #     bool_masked_pos = bool_masked_pos.unsqueeze(0)
-    #     img = img.to(device, non_blocking=True)
+    with torch.no_grad():
+        # img = img[None, :]
+        # bool_masked_pos = bool_masked_pos[None, :]
+        img = img.unsqueeze(0) #1,3,16,224,224
+        bool_masked_pos = bool_masked_pos.unsqueeze(0)
+        img = img.to(device, non_blocking=True)
     return list_1  ,  img,  bool_masked_pos
 
 

@@ -31,8 +31,6 @@ class FrameSelect(torch.utils.data.Dataset):
                  patch_size,
                  model,
                  frame_dict,
-                 listlabel
-
                  ):
         super(FrameSelect, self).__init__()
         self.root = root
@@ -41,13 +39,10 @@ class FrameSelect(torch.utils.data.Dataset):
         self.patch_size = patch_size
         self.model = model
         self.frame_dict = frame_dict
-        self.listlabel = listlabel
 
     def __getitem__(self, index):
-        string = self.listlabel[index]
-        a = string.split()
-        string = a[0][25:-4]
-        directory = self.root + str(int(string)) + ".mp4"
+
+        directory = self.root + str(int(index)) + ".mp4"
 
         with open(directory, 'rb') as f:
             vr = VideoReader(f, ctx=cpu(0))
@@ -102,8 +97,8 @@ class FrameSelect(torch.utils.data.Dataset):
         # middle_layer = middle_layer#.reshape(1,384*8,14,14)
         # middle_layer = middle_layer.reshape(1,384,8*14*14)
         # avg_method = nn.AvgPool2d(2,stride=2)  #avg默认前两个维度是batch和channel，14是square matrix的宽度
-        max_method = nn.MaxPool1d(196)
-        middle_layer = max_method(middle_layer).reshape(384,
+        max_method = nn.MaxPool1d(kernel_size=49,stride=49)
+        middle_layer = max_method(middle_layer).reshape(384, 4,
                                                         8)  # .reshape(middle_layer.shape[0],384,8,-1) #1,384*8,14*14
         # print(middle_layer.shape) #这里是1，1568，768
         # middle_layer=middle_layer.transpose(1,0)
@@ -112,12 +107,29 @@ class FrameSelect(torch.utils.data.Dataset):
         for i in range(len(list_1)):
             dict[i] = list_1[i][0]
         label = self.frame_dict[dict[0]]
-        label = a[1]
         return (middle_layer, label)
 
     def __len__(self):
         return int(43825)  # 先跑前50000吧
 
 
+class MyDataset(torch.utils.data.Dataset):
 
+    def __init__(self, data, label_list):
+        super(MyDataset, self).__init__()
+        self.data = data
+        self.label_list = label_list
+
+
+    def __getitem__(self, index):
+
+        img = self.data[index]
+
+        label = int(self.label_list[index])
+
+
+        return img, label
+
+    def __len__(self):
+        return int(50000)
 
