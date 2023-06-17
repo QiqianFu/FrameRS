@@ -29,9 +29,9 @@ def get_args():
     parser = argparse.ArgumentParser('VideoMAE visualization reconstruction script', add_help=False)
     parser.add_argument('img_path', type=str, help='input video path')
     parser.add_argument('save_path', type=str, help='save video path')
-    parser.add_argument('--statistic_path', default='/home/srtp_ghw/fqq_srtp/statistic.txt', type=str,
+    parser.add_argument('model_path', default='/home/srtp_ghw/fqq/MyMAE8/output_dir/checkpoint-1600.pth', type=str,
                         help='checkpoint path of model')
-    parser.add_argument('--model_path', default='/home/srtp_ghw/fqq/MyMAE8/output_dir/checkpoint-1600.pth', type=str,
+    parser.add_argument('--statistic_path', default='/home/srtp_ghw/fqq_srtp/statistic.txt', type=str,
                         help='checkpoint path of model')
     parser.add_argument('--log_dir', default='/home/srtp_ghw/fqq/log_dir/',
                         help='path where to tensorboard log')
@@ -110,37 +110,14 @@ def main(args):
     model.load_state_dict(checkpoint['model'])
     model.eval()
 
-    b = np.load("/home/srtp_ghw/fqq/ucf101.npy", allow_pickle=True)
-    c = [torch.tensor(x) for x in b]
 
-    f = open("dataset_ucf.txt", "r")
-    res = f.readlines()
-
-    k = np.load("/home/srtp_ghw/fqq/tensor.npy", allow_pickle=True)
-    j = [torch.tensor(x) for x in k]
-
-    q = open("dataset.txt", "r")
-    res2 = q.readlines()
-
-    o = np.load("/home/srtp_ghw/fqq/sth.npy", allow_pickle=True)
-    p = [torch.tensor(x) for x in o]
-
-    u = open("dataset_sth.txt", "r")
-    res3 = u.readlines()
-
-    z = np.load("/home/srtp_ghw/fqq/sth2.npy", allow_pickle=True)
-    v = [torch.tensor(x) for x in z]
-
-    n = open("dataset_sth2.txt", "r")
-    m = n.readlines()
-
-    fuk = np.load("/home/srtp_ghw/fqq/sth3.npy", allow_pickle=True)
+    fuk = np.load("/home/srtp_ghw/fqq/sth_for_selector.npy", allow_pickle=True)
     shet = [torch.tensor(x) for x in fuk]
 
-    da = open("dataset_sth3.txt", "r")
+    da = open("dataset_sth.txt", "r")
     it = da.readlines()
 
-    dataset_train = MyDataset(c, res, j, res2, v, m, shet, it)
+    dataset_train = MyDataset(shet,it)
 
     Model = Best_Frame_Select()
     Model = Model.to(device)

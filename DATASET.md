@@ -9,7 +9,16 @@ To build the dataset for frame selector, it is more convenient to build a npy fi
       --model_path 'YOUR_PATH/SAVE_DIR/checkpoint-1600.pth' \
       --fine_tune False
   ```
-  
+- After preparing the dataset, you should train the model 
+  ```bash
+  OUTPUT_DIR='/home/srtp_ghw/fqq_temp/output_dir'
+  VIDEO_PATH='/home/srtp_ghw/fqq/data2/'
+  MODEL_PATH="/home/srtp_ghw/fqq/MyMAE8/output_dir/checkpoint-1600.pth"
+  python3 train_selector.py \
+      --model pretrain_videomae_base_patch16_224 \
+      ${VIDEO_PATH} ${OUTPUT_DIR} ${MODEL_PATH}
+  ```
+
 After that, we can evaluate the pretraining situation by running 
 - nothing 
   ```bash

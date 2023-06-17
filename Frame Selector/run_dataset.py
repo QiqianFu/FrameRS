@@ -103,8 +103,23 @@ def main(args):
     checkpoint = torch.load(args.model_path, map_location='cpu')
     model.load_state_dict(checkpoint['model'])
     model.eval()
-    if args.fine_tune == True:
+    if args.fine_tune:
+        f = open(args.fine_tune_groundtruth)
+        lista = f.readlines()
+        a = dataset_build(args, model, patch_size, frame_dict, lista)
+        data_loader_train = torch.utils.data.DataLoader(a)
+        list = []
+        for i in data_loader_train:
+            img, label = i
+            # file = open(file="dataset_sth3.txt", mode="a")
+            # file.write(str(label.item()) + "\n")
+            # file.close()
+            list.append(img.cpu().clone().detach().numpy())
 
+
+
+
+    else:
 
         a = dataset_build(args, model, patch_size,frame_dict)
         data_loader_train = torch.utils.data.DataLoader(a)
@@ -119,23 +134,6 @@ def main(args):
 
         s_numpy = [x for x in list]  # 步骤1
         np.save(args.save_path, s_numpy)
-
-
-        s_numpy = [x for x in list]  # 步骤1
-        np.save(args.save_path, s_numpy)
-
-    else:
-        f = open(args.fine_tune_groundtruth)
-        lista = f.readlines()
-        a = dataset_build(args, model, patch_size, frame_dict, lista)
-        data_loader_train = torch.utils.data.DataLoader(a)
-        list = []
-        for i in data_loader_train:
-            img, label = i
-            # file = open(file="dataset_sth3.txt", mode="a")
-            # file.write(str(label.item()) + "\n")
-            # file.close()
-            list.append(img.cpu().clone().detach().numpy())
 
 if __name__ == '__main__':
     opts = get_args()

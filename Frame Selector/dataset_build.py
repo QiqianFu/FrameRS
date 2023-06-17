@@ -98,8 +98,8 @@ class FrameSelect(torch.utils.data.Dataset):
         # middle_layer = middle_layer.reshape(1,384,8*14*14)
         # avg_method = nn.AvgPool2d(2,stride=2)  #avg默认前两个维度是batch和channel，14是square matrix的宽度
         max_method = nn.MaxPool1d(kernel_size=49,stride=49)
-        middle_layer = max_method(middle_layer).reshape(384, 4,
-                                                        8)  # .reshape(middle_layer.shape[0],384,8,-1) #1,384*8,14*14
+        middle_layer = max_method(middle_layer)
+        middle_layer = rearrange(middle_layer,'b (c t) a -> b c t a',c=384,t=8)
         # print(middle_layer.shape) #这里是1，1568，768
         # middle_layer=middle_layer.transpose(1,0)
         list_1.sort(key=lambda x: x[1], reverse=False)
@@ -110,7 +110,7 @@ class FrameSelect(torch.utils.data.Dataset):
         return (middle_layer, label)
 
     def __len__(self):
-        return int(43825)  # 先跑前50000吧
+        return int(50000)  # 先跑前50000吧
 
 
 class MyDataset(torch.utils.data.Dataset):
