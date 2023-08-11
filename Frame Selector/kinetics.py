@@ -8,6 +8,11 @@ from torchvision import transforms
 from random_erasing import RandomErasing
 import warnings
 from decord import VideoReader, cpu
+from torchvision import transforms
+from transforms import *
+from masking_generator import TubeMaskingGenerator
+
+from ssv2 import SSVideoClsDataset
 from torch.utils.data import Dataset
 import video_transforms as video_transforms
 import volume_transforms as volume_transforms
@@ -372,6 +377,35 @@ def tensor_normalize(tensor, mean, std):
     return tensor
 
 
+class DataAugmentationForVideoMAE2(object):  # 这个是在这里覆写的一个版本，这个版本会考虑输入本身的长度
+    def __init__(self, args, duration):
+        self.input_mean = [0.485, 0.456, 0.406]  # IMAGENET_DEFAULT_MEAN
+        self.input_std = [0.229, 0.224, 0.225]  # IMAGENET_DEFAULT_STD
+        normalize = GroupNormalize(self.input_mean, self.input_std)
+        self.train_augmentation = GroupMultiScaleCrop(args.input_size, [1, .875, .75, .66])
+        self.transform = transforms.Compose([
+            self.train_augmentation,
+            Stack(roll=False),
+            ToTorchFormatTensor(div=True),
+            normalize,
+        ])
+        if args.mask_type == 'tube':
+            self.masked_position_generator = TubeMaskingGenerator(
+                args.window_size, args.mask_ratio, duration
+            )
+
+    def __call__(self, images):
+        process_data, _ = self.transform(images)
+        return process_data, self.masked_position_generator()
+
+    def __repr__(self):
+        repr = "(DataAugmentationForVideoMAE,\n"
+        repr += "  transform = %s,\n" % str(self.transform)
+        repr += "  Masked position generator = %s,\n" % str(self.masked_position_generator)
+        repr += ")"
+        return repr
+
+
 class VideoMAE(torch.utils.data.Dataset):
     """Load your own video classification dataset.
     Parameters
@@ -423,7 +457,7 @@ class VideoMAE(torch.utils.data.Dataset):
         If set to True, build a dataset instance without loading any dataset.
     """
 
-    def __init__(self,
+    def it__init__(self,
                  root,
                  setting,
                  train=True,
@@ -436,7 +470,7 @@ class VideoMAE(torch.utils.data.Dataset):
                  num_crop=1,
                  new_length=1,
                  new_step=1,
-                 transform=None,
+                 arg=None,
                  temporal_jitter=False,
                  video_loader=False,
                  use_decord=False,
@@ -453,15 +487,14 @@ class VideoMAE(torch.utils.data.Dataset):
         self.num_crop = num_crop
         self.new_length = new_length
         self.new_step = new_step
-        self.skip_length = self.new_length * self.new_step
+        # self.skip_length = self.new_length * self.new_step
         self.temporal_jitter = temporal_jitter
         self.name_pattern = name_pattern
         self.video_loader = video_loader
         self.video_ext = video_ext
         self.use_decord = use_decord
-        self.transform = transform
         self.lazy_init = lazy_init
-
+        self.args = arg
         if not self.lazy_init:
             self.clips = self._make_dataset(root, setting)
             if len(self.clips) == 0:
@@ -483,13 +516,21 @@ class VideoMAE(torch.utils.data.Dataset):
             decord_vr = decord.VideoReader(video_name, num_threads=1)
             duration = len(decord_vr)
 
-        segment_indices, skip_offsets = self._sample_train_indices(duration)
+        patch_size = [16, 16]
+        if duration % 2 == 0:
+            segment_indices = 0
+        else:
+            segment_indices = 1
+        duration = duration - segment_indices
+        self.args.window_size = (
+        duration / 2, self.args.input_size // patch_size[0], self.args.input_size // patch_size[1])
+        self.transform = DataAugmentationForVideoMAE2(self.args, duration)
 
-        images = self._video_TSN_decord_batch_loader(directory, decord_vr, duration, segment_indices, skip_offsets)
-
+        images = self._video_TSN_decord_batch_loader(directory, decord_vr, duration, segment_indices)
+        # directory是csv路径，decord_vr是解码的视频文件，duration是长度，segment_indices是
         process_data, mask = self.transform((images, None))  # T*C,H,W
-        process_data = process_data.view((self.new_length, 3) + process_data.size()[-2:]).transpose(0,
-                                                                                                    1)  # T*C,H,W -> T,C,H,W -> C,T,H,W
+        process_data = process_data.view((duration, 3) + process_data.size()[-2:]).transpose(0,
+                                                                                             1)  # T*C,H,W -> T,C,H,W -> C,T,H,W
 
         return (process_data, mask)
 
@@ -515,42 +556,8 @@ class VideoMAE(torch.utils.data.Dataset):
                 clips.append(item)
         return clips
 
-    def _sample_train_indices(self, num_frames):
-        average_duration = (num_frames - self.skip_length + 1) // self.num_segments
-        if average_duration > 0:
-            offsets = np.multiply(list(range(self.num_segments)),
-                                  average_duration)
-            offsets = offsets + np.random.randint(average_duration,
-                                                  size=self.num_segments)
-        elif num_frames > max(self.num_segments, self.skip_length):
-            offsets = np.sort(np.random.randint(
-                num_frames - self.skip_length + 1,
-                size=self.num_segments))
-        else:
-            offsets = np.zeros((self.num_segments,))
-
-        if self.temporal_jitter:
-            skip_offsets = np.random.randint(
-                self.new_step, size=self.skip_length // self.new_step)
-        else:
-            skip_offsets = np.zeros(
-                self.skip_length // self.new_step, dtype=int)
-        return offsets + 1, skip_offsets
-
-    def _video_TSN_decord_batch_loader(self, directory, video_reader, duration, indices, skip_offsets):
-        sampled_list = []
-        frame_id_list = []
-        for seg_ind in indices:
-            offset = int(seg_ind)
-            for i, _ in enumerate(range(0, self.skip_length, self.new_step)):
-                if offset + skip_offsets[i] <= duration:
-                    frame_id = offset + skip_offsets[i] - 1
-                else:
-                    frame_id = offset - 1
-                frame_id_list.append(frame_id)
-                if offset + self.new_step < duration:
-                    offset += self.new_step
-
+    def _video_TSN_decord_batch_loader(self, directory, video_reader, duration, skip_offsets):
+        frame_id_list = list(range(0, duration))
         try:
             video_data = video_reader.get_batch(frame_id_list).asnumpy()
             sampled_list = [Image.fromarray(video_data[vid, :, :, :]).convert('RGB') for vid, _ in

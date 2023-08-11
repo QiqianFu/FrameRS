@@ -10,7 +10,7 @@ from pathlib import Path
 from timm.models import create_model
 import utils
 import modeling_pretrain
-from datasets import DataAugmentationForVideoMAE
+from utils import DataAugmentationForVideoMAE
 import torch.nn.functional as F
 from torchvision.transforms import ToPILImage
 from einops import rearrange
@@ -31,6 +31,7 @@ class FrameSelect(torch.utils.data.Dataset):
                  patch_size,
                  model,
                  frame_dict,
+
                  ):
         super(FrameSelect, self).__init__()
         self.root = root
@@ -97,20 +98,24 @@ class FrameSelect(torch.utils.data.Dataset):
         # middle_layer = middle_layer#.reshape(1,384*8,14,14)
         # middle_layer = middle_layer.reshape(1,384,8*14*14)
         # avg_method = nn.AvgPool2d(2,stride=2)  #avg默认前两个维度是batch和channel，14是square matrix的宽度
-        max_method = nn.MaxPool1d(kernel_size=49,stride=49)
+        max_method = nn.MaxPool1d(kernel_size=49, stride=49)
         middle_layer = max_method(middle_layer)
-        middle_layer = rearrange(middle_layer,'b (c t) a -> b c t a',c=384,t=8)
+        middle_layer = rearrange(middle_layer, 'b (c t) a -> b c t a', c=384, t=8)
         # print(middle_layer.shape) #这里是1，1568，768
         # middle_layer=middle_layer.transpose(1,0)
         list_1.sort(key=lambda x: x[1], reverse=False)
         dict = {}
         for i in range(len(list_1)):
             dict[i] = list_1[i][0]
+
         label = self.frame_dict[dict[0]]
+
+        print(index)
+
         return (middle_layer, label)
 
     def __len__(self):
-        return int(50000)  # 先跑前50000吧
+        return int(43825)  # 先跑前50000吧
 
 
 class MyDataset(torch.utils.data.Dataset):
@@ -120,16 +125,115 @@ class MyDataset(torch.utils.data.Dataset):
         self.data = data
         self.label_list = label_list
 
-
     def __getitem__(self, index):
-
         img = self.data[index]
 
         label = int(self.label_list[index])
 
-
         return img, label
 
     def __len__(self):
-        return int(50000)
+        return int(43825)
 
+
+class MyDataset_2(torch.utils.data.Dataset):
+    def __init__(self,
+                 root,
+                 args,
+                 device,
+                 patch_size,
+                 model,
+                 frame_dict,
+                 label_list
+                 ):
+        super(MyDataset_2, self).__init__()
+        self.root = root
+        self.args = args
+        self.device = device
+        self.patch_size = patch_size
+        self.model = model
+        self.frame_dict = frame_dict
+        self.label_list = open(label_list, "r")
+
+    def __getitem__(self, index):
+        a = self.label_list.readline()
+        a = a.split()
+        label = int(a[1])
+        directory = a[0]
+        # directory = self.root + str(int(index)) + ".mp4"
+
+        with open(directory, 'rb') as f:
+            vr = VideoReader(f, ctx=cpu(0))
+        duration = len(vr)
+        new_length = 1
+        new_step = 1
+        skip_length = new_length * new_step
+        # frame_id_list = [1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61]
+
+        tmp = np.arange(0, 32, 2)
+
+        frame_id_list = tmp.tolist()
+        try:
+            video_data = vr.get_batch(frame_id_list).asnumpy()
+        except:
+            try:
+                tmp = np.arange(0, 16, 1)
+                frame_id_list = tmp.tolist()
+
+                video_data = vr.get_batch(frame_id_list).asnumpy()
+
+            except:
+
+                print("now is %i", index)
+                linshi_root = '/home/srtp_ghw/fqq/hmdb51/video_'
+                directory = linshi_root + str(int((index / 2) % 10000)) + ".avi"
+
+            with open(directory, 'rb') as f:
+                vr = VideoReader(f, ctx=cpu(0))
+            duration = len(vr)
+            new_length = 1
+            new_step = 1
+            skip_length = new_length * new_step
+            # frame_id_list = [1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61]
+
+            tmp = np.arange(0, 16, 1)
+            frame_id_list = tmp.tolist()
+
+            video_data = vr.get_batch(frame_id_list).asnumpy()
+
+        frame_list = [0, 1, 2, 3, 4, 5, 6, 7]
+        img = [Image.fromarray(video_data[vid, :, :, :]).convert('RGB') for vid, _ in enumerate(frame_id_list)]
+        transforms = DataAugmentationForVideoMAE(self.args)
+        img, bool_masked_pos = transforms((img, None), frame_list=frame_list)  # T*C,H,W
+        # print(img.shape)
+        img = img.view((self.args.num_frames, 3) + img.size()[-2:]).transpose(0, 1)  # T*C,H,W -> T,C,H,W -> C,T,H,W
+        # img = img.view(( -1 , args.num_frames) + img.size()[-2:])
+        bool_masked_pos = torch.from_numpy(bool_masked_pos)
+
+        with torch.no_grad():
+            # img = img[None, :]
+            # bool_masked_pos = bool_masked_pos[None, :]
+            img = img.unsqueeze(0)  # 1,3,16,224,224
+            bool_masked_pos = bool_masked_pos.unsqueeze(0)
+            img = img.to(self.device, non_blocking=True)
+
+        shape = bool_masked_pos.shape
+        no_mask = np.zeros(shape=shape)
+        no_mask = torch.from_numpy(no_mask)
+        no_mask = no_mask.unsqueeze(0)
+        no_mask = no_mask.to(self.device, non_blocking=True).flatten(1).to(torch.bool)
+        middle_layer = self.model(img, no_mask, want_middle=True)  # 应该是[1,368*8,14,14] 这里是肯定不对的
+        middle_layer = rearrange(middle_layer, 'b c (t p0 p1) -> b (c t) (p0 p1)', p0=14, p1=14)
+        # middle_layer = middle_layer#.reshape(1,384*8,14,14)
+        # middle_layer = middle_layer.reshape(1,384,8*14*14)
+        # avg_method = nn.AvgPool2d(2,stride=2)  #avg默认前两个维度是batch和channel，14是square matrix的宽度
+        max_method = nn.MaxPool1d(kernel_size=49, stride=49)
+        middle_layer = max_method(middle_layer)
+        middle_layer = rearrange(middle_layer, 'b (c t) a -> b c t a', c=384, t=8)
+        # print(middle_layer.shape) #这里是1，1568，768
+        # middle_layer=middle_layer.transpose(1,0)
+
+        return (middle_layer, label)
+
+    def __len__(self):
+        return int(43825)  # 先跑前50000吧

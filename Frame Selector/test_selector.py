@@ -23,38 +23,15 @@ from utils import TubeMaskingGenerator
 from utils import evaluate_fun
 from dataset_build import FrameSelect
 from model import Best_Frame_Select, fit
-from utils import MyDataset
+from dataset_build import MyDataset
 
 def get_args():
+    # parser.add_argument('model_path', type=str, help='checkpoint path of model')
+    # parser.add_argument('model_depth', type=str, help='checkpoint path of model')
     parser = argparse.ArgumentParser('Test selector accuracy script', add_help=False)
     parser.add_argument('--selector_path', default= "/home/srtp_ghw/fqq/output_dir/mymodel_success_really_10000_",type=str, help='checkpoint path of model')
     parser.add_argument('--model_path', default="/home/srtp_ghw/fqq/MyMAE8/output_dir/checkpoint-1600.pth" ,type=str, help='checkpoint path of model')
     parser.add_argument('--data_path', default="/home/srtp_ghw/fqq/data2/" ,type=str, help='the path of video')
-
-
-
-
-def main(args):
-    begin_number = 420
-    for i in range(10):
-        current = begin_number+20*i
-        a,b=runit(model_path=args.model_path,model_depth=args.selector_path+str(current)+".pth",data_path=args.data_path)
-        print("now is checkpoint %d, the accurate is %f, first acc is %f"%(current,a,b))
-
-
-
-if __name__ == '__main__':
-    opts = get_args()
-    main(opts)
-
-
-
-
-def get_args():
-    parser = argparse.ArgumentParser('VideoMAE visualization reconstruction script', add_help=False)
-    # parser.add_argument('model_path', type=str, help='checkpoint path of model')
-    # parser.add_argument('model_depth', type=str, help='checkpoint path of model')
-
     parser.add_argument('--mask_type', default='tube', choices=['random', 'tube'],
                         type=str, help='masked strategy of video tokens/patches')
     parser.add_argument('--num_frames', type=int, default=16)
@@ -123,9 +100,10 @@ def runit(model_path, model_depth,data_path):
 
     accurate = 0
     only_acc = 0
-    for i in range(300):
+    k=0
+    for i in range(100):
 
-        directory = data_path + str(10) + ".mp4"
+        directory = data_path + str(50000+i) + ".mp4"
         with open(directory, 'rb') as f:
             vr = VideoReader(f, ctx=cpu(0))
         duration = len(vr)
@@ -133,14 +111,12 @@ def runit(model_path, model_depth,data_path):
         new_step = 1
         skip_length = new_length * new_step
         # frame_id_list = [1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61]
-        tmp = np.arange(0, 16, 1)
+        tmp = np.arange(0, 32, 2)
         frame_id_list = tmp.tolist()
         try:
             video_data = vr.get_batch(frame_id_list).asnumpy()
         except:
-            tmp = np.arange(0, 16, 1)
-            frame_id_list = tmp.tolist()
-            video_data = vr.get_batch(frame_id_list).asnumpy()
+            continue
         list_1 = []
         list_1, img, bool_masked_pos = evaluate_fun(video_data=video_data, args=args, frame_id_list=frame_id_list,
                                                     device=device, patch_size=patch_size, model=model, list_1=list_1)
@@ -157,9 +133,9 @@ def runit(model_path, model_depth,data_path):
         # middle_layer = middle_layer#.reshape(1,384*8,14,14)
         # middle_layer = middle_layer.reshape(1,384,8*14*14)
         # avg_method = nn.AvgPool2d(2,stride=2)  #avg默认前两个维度是batch和channel，14是square matrix的宽度
-        max_method = nn.MaxPool1d(196)
-        middle_layer = max_method(middle_layer).reshape(384,
-                                                        8)  # .reshape(middle_layer.shape[0],384,8,-1) #1,384*8,14*14
+        max_method = nn.MaxPool1d(kernel_size=49, stride=49)
+        middle_layer = max_method(middle_layer)
+        middle_layer = rearrange(middle_layer, 'b (c t) a -> b c t a', c=384, t=8)
 
         # print(middle_layer.shape) #这里是1，1568，768
         list_1.sort(key=lambda x: x[1], reverse=False)
@@ -187,9 +163,22 @@ def runit(model_path, model_depth,data_path):
         #     accurate+=1
         elif right2 == label:
             accurate += 1
+        k+=1
         # elif a.argmax().item()==label2 :
         #     accurate+=1
     # print(accurate/80)
-    return accurate / 300, only_acc / 300
+    return accurate / k, only_acc / k
 
 
+def main(args):
+    begin_number = 420
+    for i in range(10):
+        current = begin_number+20*i
+        a,b=runit(model_path=args.model_path,model_depth=args.selector_path+str(current)+".pth",data_path=args.data_path)
+        print("now is checkpoint %d, the accurate is %f, first acc is %f"%(current,a,b))
+
+
+
+if __name__ == '__main__':
+    opts = get_args()
+    main(opts)

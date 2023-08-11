@@ -115,7 +115,8 @@ def main(args):
             # file.write(str(label.item()) + "\n")
             # file.close()
             list.append(img.cpu().clone().detach().numpy())
-
+        s_numpy = [x for x in list]  # 步骤1
+        np.save(args.save_path, s_numpy)
 
 
 

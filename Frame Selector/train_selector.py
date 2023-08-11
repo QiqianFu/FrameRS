@@ -9,7 +9,6 @@ from pathlib import Path
 from timm.models import create_model
 import utils
 import modeling_pretrain
-from datasets import DataAugmentationForVideoMAE
 import torch.nn.functional as F
 from torchvision.transforms import ToPILImage
 from einops import rearrange
@@ -22,7 +21,7 @@ from masking_generator import TubeMaskingGenerator
 from utils import evaluate_fun
 from dataset_build import FrameSelect
 from model import Best_Frame_Select, fit
-from dataset_build import MyDataset
+from dataset_build import MyDataset,MyDataset_2
 
 
 def get_args():
@@ -31,6 +30,9 @@ def get_args():
     parser.add_argument('save_path', type=str, help='save video path')
     parser.add_argument('model_path', default='/home/srtp_ghw/fqq/MyMAE8/output_dir/checkpoint-1600.pth', type=str,
                         help='checkpoint path of model')
+    parser.add_argument('--fine_tune',default=False,type=bool)
+    parser.add_argument('--label',type=str)
+    parser.add_argument('--data',type=str)
     parser.add_argument('--statistic_path', default='/home/srtp_ghw/fqq_srtp/statistic.txt', type=str,
                         help='checkpoint path of model')
     parser.add_argument('--log_dir', default='/home/srtp_ghw/fqq/log_dir/',
@@ -111,13 +113,13 @@ def main(args):
     model.eval()
 
 
-    fuk = np.load("/home/srtp_ghw/fqq/sth_for_selector.npy", allow_pickle=True)
+    fuk = np.load(args.data, allow_pickle=True)
     shet = [torch.tensor(x) for x in fuk]
 
-    da = open("dataset_sth.txt", "r")
+    da = open(args.label, "r")
     it = da.readlines()
 
-    dataset_train = MyDataset(shet,it)
+    dataset_train = MyDataset(shet,it,args.fine_tune)
 
     Model = Best_Frame_Select()
     Model = Model.to(device)

@@ -9,6 +9,13 @@ To build the dataset for frame selector, it is more convenient to build a npy fi
       --model_path 'YOUR_PATH/SAVE_DIR/checkpoint-1600.pth' \
       --fine_tune False
   ```
+- However, if you want to use it for action recgnoize, then you should run 
+  ```bash
+  python3 run_dataset.py \
+      --img_path   'YOUR_PATH/SSV2/'  \
+      --model_path 'YOUR_PATH/SAVE_DIR/checkpoint-1600.pth' \
+      --fine_tune False
+  ```
 - After preparing the dataset, you should train the model 
   ```bash
   OUTPUT_DIR='/home/srtp_ghw/fqq_temp/output_dir'
@@ -16,7 +23,11 @@ To build the dataset for frame selector, it is more convenient to build a npy fi
   MODEL_PATH="/home/srtp_ghw/fqq/MyMAE8/output_dir/checkpoint-1600.pth"
   python3 train_selector.py \
       --model pretrain_videomae_base_patch16_224 \
+      --fine_tune True \
+      --label "/home/srtp_ghw/fqq/50000.txt" \
+      --data  "/home/srtp_ghw/fqq/sth_for_174.npy"
       ${VIDEO_PATH} ${OUTPUT_DIR} ${MODEL_PATH}
+  
   ```
 
 After that, we can evaluate the pretraining situation by running 
@@ -27,6 +38,11 @@ After that, we can evaluate the pretraining situation by running
       --model_path 'YOUR_PATH/SAVE_DIR/checkpoint-1600.pth' \
       --data_path 'YOUR_PATH/SSV2/'
   ```
+- if you want to try maxpooling 49, then you should replace 
+-       max_method = nn.MaxPool1d(kernel_size=49, stride=49)
+        middle_layer = max_method(middle_layer)
+        middle_layer = rearrange(middle_layer, 'b (c t) a -> b c t a', c=384, t=8)
+- what's more, the model should also be modified simplily
 - if you are going to use selector to compress a video and visulaze it, run the following
   ```bash
   python3 frame_selctor.py \

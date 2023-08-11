@@ -27,9 +27,9 @@ class Best_Frame_Select(nn.Module):
     def __init__(self):
         super(Best_Frame_Select, self).__init__()
 
-        self.conv1 = nn.Conv2d(384, 192, kernel_size=(3,1),stride = (1,1), padding=(1,0))
+        self.conv1 = nn.Conv2d(384, 384, kernel_size=(3,4),stride = (1,1), padding=(1,0))
         self.conv2 = nn.Conv2d(192, 192, kernel_size=(3,4),stride = (1,1), padding=(1,0))
-        self.conv3 = nn.Conv1d(192,192,kernel_size=3,padding=1)
+        self.conv3 = nn.Conv1d(384, 384, kernel_size=3,padding=1)
         self.bn = nn.BatchNorm2d(384)
         self.relu = nn.ReLU()
         self.drop = nn.Dropout(p=0.1)
@@ -40,13 +40,9 @@ class Best_Frame_Select(nn.Module):
         print("Epoch [{}], total_accurate: {:.4f},  val_loss: {:.4f}".format(epoch, total_accuracy, result))
 
     def forward(self, input):
-        input = self.bn(input)    #[16,384,8,4]
-        print(np.shape(input))
-
+        input = self.bn(input)   #[16,384,8,4]
         input = self.conv1(input)
-        input = self.conv2(input) #output should be (b, 192, 8, 1)
-
-        input = rearrange(input, 'b t c a-> b (t c)', a=1)
+        input = rearrange(input, 'b c t a-> b c (t a)', a=1)
         identity = input
         input = self.conv3(input)
         input = self.drop(input)
@@ -90,7 +86,8 @@ def fit(lr, model, input, opt, loss_fc, devices, current_epoch, statistic_dict, 
     for step, batch in enumerate(input):
         image, label = batch
         image = image.to(devices)
-        image = image.reshape(16, 384,4, 8)
+        image = image.reshape(16, 384,8, 4)
+
         label = label.to(devices)  # label是按重要性排序后排出来的顺序
 
         out = model(image)  # out是我的linear层的输出，28个数对应着每一个组合的重要性
