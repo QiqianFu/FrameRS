@@ -1,7 +1,12 @@
 # DATASET BUILD
-## Build Dataset For Frame Selector
+## Build Dataset For FrameMAE
 
-To build the dataset for frame selector, it is more convenient to build a npy file frist.
+To build the dataset for FrameMAE, please download 
+
+
+## Build Dataset For Key Frame Selector
+
+To build the dataset for Key Frame Selector, it is more convenient to build a npy file frist.
 - for example, if you want to build a dataset using SSV2 with the checkpoint of 1600 epoch, you can run the following command
   ```bash
   python3 run_dataset.py \
@@ -9,13 +14,7 @@ To build the dataset for frame selector, it is more convenient to build a npy fi
       --model_path 'YOUR_PATH/SAVE_DIR/checkpoint-1600.pth' \
       --fine_tune False
   ```
-- However, if you want to use it for action recgnoize, then you should run 
-  ```bash
-  python3 run_dataset.py \
-      --img_path   'YOUR_PATH/SSV2/'  \
-      --model_path 'YOUR_PATH/SAVE_DIR/checkpoint-1600.pth' \
-      --fine_tune False
-  ```
+
 - After preparing the dataset, you should train the model 
   ```bash
   OUTPUT_DIR='/home/srtp_ghw/fqq_temp/output_dir'
@@ -30,15 +29,15 @@ To build the dataset for frame selector, it is more convenient to build a npy fi
   
   ```
 
-After that, we can evaluate the pretraining situation by running 
-- nothing 
+After that, we can evaluate the model by running the following commands.
+- If you want to evaluate the model, you can run
   ```bash
   python3 test_selector.py \
       --selector_path 'YOUR_PATH/SAVE_DIR/checkpoint.pth'  \
       --model_path 'YOUR_PATH/SAVE_DIR/checkpoint-1600.pth' \
       --data_path 'YOUR_PATH/SSV2/'
   ```
-- if you want to try maxpooling 49, then you should replace 
+- if you want to try maxpooling 49, then you should replace the codes in [dataset_build.py](./Frame Selector/dataset_build.py)
 -       max_method = nn.MaxPool1d(kernel_size=49, stride=49)
         middle_layer = max_method(middle_layer)
         middle_layer = rearrange(middle_layer, 'b (c t) a -> b c t a', c=384, t=8)
