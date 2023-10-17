@@ -1,7 +1,8 @@
 # DATASET BUILD
+
 ## Build Dataset For FrameMAE
 
-To build the dataset for FrameMAE, please download 
+To build the dataset for FrameMAE, please download [UCF101](https://www.crcv.ucf.edu/data/UCF101.php) and [HMDB51](https://serre-lab.clps.brown.edu/resource/hmdb-a-large-human-motion-database/) from its official website   
 
 
 ## Build Dataset For Key Frame Selector
@@ -41,10 +42,8 @@ After that, we can evaluate the model by running the following commands.
 -       max_method = nn.MaxPool1d(kernel_size=49, stride=49)
         middle_layer = max_method(middle_layer)
         middle_layer = rearrange(middle_layer, 'b (c t) a -> b c t a', c=384, t=8)
-- what's more, the model should also be modified simplily
+<!-- - what's more, the model should also be modified simplily -->
 - if you are going to use selector to compress a video and visulaze it, run the following
   ```bash
   python3 frame_selctor.py \
-      
-
   ```

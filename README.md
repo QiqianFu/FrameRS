@@ -24,7 +24,7 @@ with our customized Key Frame Selector, we can compress a video clip by only sto
 
 ## ➡️ Pretrainng
 
-#### Follow the instruction in [readme.md]() for training FrameMAE and Key Frame Selector
+#### Follow the instruction in [PRETRAIN.md]() for training FrameMAE and Key Frame Selector
 
 ## 👍 Acknowledgements 
 
